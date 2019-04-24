@@ -38,7 +38,6 @@ gamma_free          % Free market
 % gamma_unique        % Unique Transmission Price (UTP)
 % gamma_distance      % Distance Transmission Price (DTP)
 % gamma_zonal         % Uniform Zonal Transmission Price (ZTP)
-% % % % % gamma_nodal         % Nodal Transmission Price (NTP)
 
 %% Definition of optimization parameters
 ADMM_opt.rho = 1;
