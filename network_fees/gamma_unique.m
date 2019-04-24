@@ -1,4 +1,7 @@
+% network_fees = [0:4:40 45 50:10:100];
 network_fees = [0:1:100];
+
+% N_tests=length(network_fees);
 
 gamma_base = zeros(n_agents,n_agents,N_tests);
 gamma = zeros(n_agents);

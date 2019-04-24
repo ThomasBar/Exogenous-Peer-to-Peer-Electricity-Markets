@@ -5,28 +5,33 @@ close all;
 
 % What type of network to study?
 % choice between:
-% 'free' - free market without network fees
-% 'uniq' - market with unique network fee
-% 'dist' - market with network fees proportional to electrical distances
-% 'zona' - market with network fees by zones
-% 'noda' - market with network fees by nodes (ie zone=node)
+% 'free' - free market without unit fees
+% 'uniq' - market with unique unit fee
+% 'dist' - market with unit fees proportional to electrical distances
+% 'zona' - market with unit fees by zones
+% 'noda' - market with unit fees by nodes (ie zone=node)
 type_fee = {'uniq','dist','zona'};
-% type_fee = {'uniq'};
+% type_fee = {'zona'};
 
 % What type of plot?
 % choice between:
 % 'trades' - show on map the used trades (lines thickness representing the amount of power exchanged)
 % 'exchan' - show on map the exchanges between zones and zones power balance
+% 'effici' - show on graph the cost allocation efficiencies compared to classical pool market and economic dispatch
 % 'lflows' - show on graph the change of line flows (dc power flow) compared to a reference (ie free market)
 % 'anaMar' - anamorphosis of participants interactions
 % 'anaNet' - anamorphosis of network usage
-type_plot = 'exchan';
+type_plot = 'lflows';
 
-%% Network fee type
+%% Unit fee type
 Fees=load_fee_label(type_fee);
 n_fee = length(type_fee);
 %% Plot - Trades evolution on map
 if strcmp(type_plot,'trades')
+    % Plot options
+    % 0 - Graph - Sum of all trades
+    % 1 - Map
+    type_display = 1;
     % 0 - No scaling (default)
     % 1 - Scaling (on lines thickness and axes limits)
     type_scale = 1;
@@ -39,98 +44,161 @@ if strcmp(type_plot,'trades')
     % Power trades threshold 
     power_threshold = 10^-2;    % in MW
     
-    for f=1:n_fee
-        for test=Fees{f}.n_tests_start:Fees{f}.n_tests_stop
-            first_intra = 1;
-            first_extra = 1;
-            legends=cell(2+2*type_agent,1);
-            plots=[];%zeros(2+2*type_agent,1);
-            results = load_results(Fees{f}.label,test);
-            Pos = results.testcase.genpos;
-            %     close all
-            fig=figure(test*f);
-            xlim([0.02 1.03])
-            ylim([0 0.95])
-            axis off
-            hold on
-            for n=results.consumers
-                P_net = sum(results.Z(n,:));
-                for m=results.om{n}
-                    trade_value = results.Z(n,m);
-                    
-                    if abs(trade_value)>power_threshold
-                        % Edges color definition
-%                         if test==1
-                            %Color_intra = [153, 182, 255]/255; % blue: intra-zone exchanges
-                            Color_intra = [102, 255, 117]/255; % green: intra-zone exchanges
-                            Color_extra = [254, 103, 105]/255; % red: extra-zone exchanges
-%                         end
-                        if trade_value~=0
-                            if results.testcase.bus(results.testcase.gen(n,1),7)==results.testcase.bus(results.testcase.gen(m,1),7)
-                                EdgeColor = Color_intra;
+    if type_display
+        for f=1:n_fee
+            for test=Fees{f}.n_tests_start:Fees{f}.n_tests_stop
+                first_intra = 1;
+                first_extra = 1;
+                legends=cell(2+2*type_agent,1);
+                plots=[];%zeros(2+2*type_agent,1);
+                results = load_results(Fees{f}.label,test);
+                Pos = results.testcase.genpos;
+                %     close all
+                fig=figure(test*f);
+                xlim([0.02 1.03])
+                ylim([0 0.95])
+                axis off
+                hold on
+                for n=results.consumers
+                    P_net = sum(results.P(n,:));
+                    for m=results.om{n}
+                        trade_value = results.P(n,m);
+
+                        if abs(trade_value)>power_threshold
+                            % Edges color definition
+    %                         if test==1
+                                %Color_intra = [153, 182, 255]/255; % blue: intra-zone exchanges
+                                Color_intra = [102, 255, 117]/255; % green: intra-zone exchanges
+                                Color_extra = [254, 103, 105]/255; % red: extra-zone exchanges
+    %                         end
+                            if trade_value~=0
+                                if results.testcase.bus(results.testcase.gen(n,1),7)==results.testcase.bus(results.testcase.gen(m,1),7)
+                                    EdgeColor = Color_intra;
+                                else
+                                    EdgeColor = Color_extra;
+                                end
+                            end
+
+                            if type_scale==1
+                                if test==1
+                                    Weight_ref = max(max(abs(results.P)));
+                                end
+                                LWidth = 2*abs(trade_value)/Weight_ref;
                             else
-                                EdgeColor = Color_extra;
+                                LWidth = 2*abs(trade_value)/100;%max(max(abs(results.P)));
                             end
-                        end
-                        
-                        if type_scale==1
-                            if test==1
-                                Weight_ref = max(max(abs(results.Z)));
+
+                            h=plot(Pos([n m],2),Pos([n m],1),'Color',EdgeColor,'LineWidth',LWidth);
+                            if first_extra && sum(EdgeColor==Color_extra)
+                                %plots{2}=h;
+                                plots(2)=h;
+                                legends{2}='Extra-zone trades';
+                                first_extra=0;
                             end
-                            LWidth = 5*abs(trade_value)/Weight_ref;
-                        else
-                            LWidth = 5*abs(trade_value)/100;%max(max(abs(results.Z)));
+                            if first_intra && sum(EdgeColor==Color_intra)
+                                %plots{1}=h;
+                                plots(1)=h;
+                                legends{1}='Intra-zone trades';
+                                first_intra=0;
+                            end
+                            %set(h,'EdgeAlpha',0.5);
                         end
-                        
-                        h=plot(Pos([n m],2),Pos([n m],1),'Color',EdgeColor,'LineWidth',LWidth);
-                        if first_extra && sum(EdgeColor==Color_extra)
-                            %plots{2}=h;
-                            plots(2)=h;
-                            legends{2}='Extra-zone trades';
-                            first_extra=0;
-                        end
-                        if first_intra && sum(EdgeColor==Color_intra)
-                            %plots{1}=h;
-                            plots(1)=h;
-                            legends{1}='Intra-zone trades';
-                            first_intra=0;
-                        end
-                        %set(h,'EdgeAlpha',0.5);
                     end
                 end
+
+                if type_agent
+                    plots(3)=plot(Pos(results.producers,2),Pos(results.producers,1),'LineStyle','none','Marker','d','MarkerFaceColor',[0 114/255 189/255],'MarkerEdgeColor',[0 114/255 189/255]);
+                    hold on
+                    plots(4)=plot(Pos(results.consumers,2),Pos(results.consumers,1),'LineStyle','none','Marker','o','MarkerFaceColor',[74/255 189/255 238/255],'MarkerEdgeColor',[74/255 189/255 238/255]);
+                    legends{3}='Producers';
+                    legends{4}='Consumers';
+                end
+
+                if type_zoning
+                    % zone 1
+                    areapos = results.testcase.areapos{1};
+                    plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{1},'LineWidth',1.25)
+                    text(0.1,0.8,'Zone 1','Color',results.testcase.areacolor{1},'FontWeight','bold')
+                    % zone 2
+                    areapos = results.testcase.areapos{2};
+                    plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{2},'LineWidth',1.25)
+                    text(0.87,0.88,'Zone 2','Color',results.testcase.areacolor{2},'FontWeight','bold')
+                    %     % zone 3
+                    areapos = results.testcase.areapos{3};
+                    plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{3},'LineWidth',1.25)
+                    text(0.35,0.25,'Zone 3','Color',results.testcase.areacolor{3},'FontWeight','bold')
+                    %     % zone 4
+                    areapos = results.testcase.areapos{4};
+                    plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{4},'LineWidth',1.25)
+                    text(0.6,0.4,'Zone 4','Color',results.testcase.areacolor{4},'FontWeight','bold')
+                end
+
+                fig.Position(3:4) = [1.4 1.5].*fig.Position(3:4);%[626   626];
+                fig.Position(2) = fig.Position(2) - fig.Position(4)/3;
+    %             legend(plots,legends,'Location','North')
             end
-            
-            if type_agent
-                plots(3)=plot(Pos(results.producers,2),Pos(results.producers,1),'LineStyle','none','Marker','d','MarkerFaceColor',[0 114/255 189/255],'MarkerEdgeColor',[0 114/255 189/255]);
-                hold on
-                plots(4)=plot(Pos(results.consumers,2),Pos(results.consumers,1),'LineStyle','none','Marker','o','MarkerFaceColor',[74/255 189/255 238/255],'MarkerEdgeColor',[74/255 189/255 238/255]);
-                legends{3}='Producers';
-                legends{4}='Consumers';
-            end
-            
-            if type_zoning
-                % zone 1
-                areapos = results.testcase.areapos{1};
-                plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{1},'LineWidth',1.25)
-                text(0.1,0.8,'Zone 1','Color',results.testcase.areacolor{1},'FontWeight','bold')
-                % zone 2
-                areapos = results.testcase.areapos{2};
-                plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{2},'LineWidth',1.25)
-                text(0.87,0.88,'Zone 2','Color',results.testcase.areacolor{2},'FontWeight','bold')
-                %     % zone 3
-                areapos = results.testcase.areapos{3};
-                plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{3},'LineWidth',1.25)
-                text(0.35,0.25,'Zone 3','Color',results.testcase.areacolor{3},'FontWeight','bold')
-                %     % zone 4
-                areapos = results.testcase.areapos{4};
-                plot(areapos(:,1),areapos(:,2),'LineStyle','--','Color',results.testcase.areacolor{4},'LineWidth',1.25)
-                text(0.6,0.4,'Zone 4','Color',results.testcase.areacolor{4},'FontWeight','bold')
-            end
-            
-            fig.Position(3:4) = [1.4 1.5].*fig.Position(3:4);%[626   626];
-            fig.Position(2) = fig.Position(2) - fig.Position(4)/3;
-            legend(plots,legends,'Location','North')
         end
+    else
+        
+        % Load pool price
+        Pool_results = load('simulations/results_Free_1.mat');
+        Pool_results = Pool_results.results;
+        prices = zeros(Pool_results.n_agents,1);
+        for n=1:Pool_results.n_agents
+            prices(n)=mean(Pool_results.Y(n,Pool_results.om{n}));
+        end
+        Price_ref = mean(prices);
+        
+        % Evaluate global objectives
+        Volumes = cell(n_fee,1);
+        starts = zeros(n_fee,1);
+        stops = zeros(n_fee,1);
+        for f=1:n_fee
+            Volumes{f} = zeros(Fees{f}.N_tests,1);
+            
+            % Set range of showed fees
+            if Fees{f}.n_tests_start>1
+                Fees{f}.show = [1 Fees{f}.n_tests_start:Fees{f}.n_tests_stop];
+            else
+                Fees{f}.show = Fees{f}.n_tests_start:Fees{f}.n_tests_stop;
+            end
+            starts(f) = Fees{f}.n_tests_start;
+            stops(f) = Fees{f}.n_tests_stop;
+            % Get flow rates and normalize them
+            for test=Fees{f}.show
+                results = load_results(Fees{f}.label,test);
+                Volumes{f}(test) = sum(sum(abs(results.P)))/2;
+            end
+        end
+        
+        % Plot references
+        fig=figure;
+        hold on
+        legends=cell(n_fee,1);
+        hs=cell(n_fee,1);
+        Colors = [55,126,184;228,26,28;152,78,163]/255;
+        
+        % Plot results
+        maxs = zeros(n_fee,1);
+        mins = zeros(n_fee,1);
+        count=1;
+        for f=1:n_fee
+            xs = Fees{f}.n_tests_start:Fees{f}.n_tests_stop;
+            xs = xs./Price_ref *100;
+            hs{count}=plot(xs,Volumes{f},'Color',Colors(f,:),'LineWidth',1.1);
+            maxs(f) = max(Volumes{f});
+            mins(f) = min(Volumes{f});
+            legends{count}=strcat('\it ',Fees{f}.legend2);
+            count=count+1;
+        end
+        vline(10/Price_ref*100,'k--','17.5%')
+        fig.Position(3:4) = [492   626/2];
+        legend(legends,'FontName','Times New Roman','FontSize',10)
+        xlabel('Unit fee (% of free market price)','FontName','Times New Roman','FontSize',11);
+        ylabel('Total power traded (MW)','FontName','Times New Roman','FontSize',11);
+        xlim([min(starts) max(stops)]./Price_ref *100)
+        %ylim([min(mins)-5 max(maxs)+5])
+        fig.Position(3:4) = [492   626/2];
     end
 end
 
@@ -161,11 +229,12 @@ if strcmp(type_plot,'exchan')
 
             % Zone exchanges
             bus_area = results.testcase.bus(:,7);
+            ag_bus = results.testcase.gen(:,1);
             n_zones = max(bus_area);
             P_exch = zeros(n_zones);
             for i=1:results.n_agents
                 for j=1:results.n_agents
-                    P_exch(bus_area(i),bus_area(j)) = P_exch(bus_area(i),bus_area(j)) + results.P(i,j);
+                    P_exch(bus_area(ag_bus(i)),bus_area(ag_bus(j))) = P_exch(bus_area(ag_bus(i)),bus_area(ag_bus(j))) + results.P(i,j);
                 end
             end
             %P_exch
@@ -230,7 +299,6 @@ if strcmp(type_plot,'exchan')
         count=1;
         legends=cell(n_fee,1);
         for f=1:n_fee
-            
             xs = Fees{f}.n_tests_start:Fees{f}.n_tests_stop;
             ys = zeros(length(xs),1);
             for test=xs
@@ -244,11 +312,12 @@ if strcmp(type_plot,'exchan')
                 end
                 % Zone exchanges
                 bus_area = results.testcase.bus(:,7);
+                ag_bus = results.testcase.gen(:,1);
                 n_zones = max(bus_area);
                 P_exch = zeros(n_zones);
                 for i=1:results.n_agents
                     for j=1:results.n_agents
-                        P_exch(bus_area(i),bus_area(j)) = P_exch(bus_area(i),bus_area(j)) + results.P(i,j);
+                        P_exch(bus_area(ag_bus(i)),bus_area(ag_bus(j))) = P_exch(bus_area(ag_bus(i)),bus_area(ag_bus(j))) + results.P(i,j);
                     end
                 end
                 ys(test) = sum(sum(abs( triu(P_exch,1) )));
@@ -258,13 +327,150 @@ if strcmp(type_plot,'exchan')
             legends{count}=strcat('\it ',Fees{f}.legend2);
             count=count+1;
         end
-        
+        vline(10/Price_ref*100,'k--','17.5%')
         f1.Position(3:4) = [492   626/2];
         axis tight
         legend(legends,'FontName','Times New Roman','FontSize',10)
-        xlabel('Network fee (% of free market electricity price)','FontName','Times New Roman','FontSize',11);
+        xlabel('Unit fee (% of free market price)','FontName','Times New Roman','FontSize',11);
         ylabel('Absolute inter-zone exchanges (MW)','FontName','Times New Roman','FontSize',11);
     end
+end
+
+%% Plot - Line flow rates evolution
+if strcmp(type_plot,'effici')
+    % Plot references
+    % 0 - None
+    % 1 - Classical pool market
+    % 2 - Classical economic dispatch
+    % 3 - Both pool market and economic dispatch
+    type_ref = 3;
+    % Plot y-axis scale
+    % 0 - Linear
+    % 1 - Log (only for positive objectives)
+    type_scale = 0;
+    % Plot money scale
+    % 1 - €
+    % 2 - k€
+    % 3 - M€
+    % 4 - B€
+    type_money = 2;
+    % Plot full range
+    % 0 - Only for feasible market outcomes
+    % 1 - All market outcomes
+    type_full = 0;
+    
+    
+    Money_ref = {1,1e3,1e6,1e9};
+    Money_txt = {'€','k€','M€','B€'};
+    Colors = [55,126,184;228,26,28;152,78,163]/255;
+    
+    % Load pool results
+    Pool_results = load('simulations/results_Free_1.mat');
+    Pool_results = Pool_results.results;
+    Pool_Pnet = sum(Pool_results.P,2);
+    Pool_Obj = sum( 0.5*Pool_results.testcase.gencost(:,5).*(Pool_Pnet.^2) +  Pool_results.testcase.gencost(:,6).*Pool_Pnet +  Pool_results.testcase.gencost(:,7) )/Money_ref{type_money};
+    
+    % Load economic dispatch results
+    ED_options = mpoption('model','DC','out.all',0);
+    evalc('[ED_results, ED_success] = runopf(Pool_results.testcase,ED_options);');
+    if ~ED_success, error('unsuccessful economic dispatch'); end
+    ED_Obj = ED_results.f/Money_ref{type_money};
+    
+    % Evaluate initial electricity market price (before grid tariffs)
+    prices = zeros(Pool_results.n_agents,1);
+    for n=1:Pool_results.n_agents
+        prices(n)=mean(Pool_results.Y(n,Pool_results.om{n}));
+    end
+    Price_ref = mean(prices);
+    
+    % Evaluate global objectives
+    Obj = cell(n_fee,1);
+    Flow_rates = cell(n_fee,1);
+    starts = zeros(n_fee,1);
+    stops = zeros(n_fee,1);
+    for f=1:n_fee
+        Obj{f} = zeros(Fees{f}.N_tests,1);
+        Flow_rates{f} = zeros(Fees{f}.N_tests,1);
+        
+        % Set range of showed fees
+        if Fees{f}.n_tests_start>1
+            Fees{f}.show = [1 Fees{f}.n_tests_start:Fees{f}.n_tests_stop];
+        else
+            Fees{f}.show = Fees{f}.n_tests_start:Fees{f}.n_tests_stop;
+        end
+        starts(f) = Fees{f}.n_tests_start;
+        stops(f) = Fees{f}.n_tests_stop;
+        % Get flow rates and normalize them
+        for test=Fees{f}.show
+            results = load_results(Fees{f}.label,test);
+            Pnet = sum(results.P,2);
+            Obj{f}(test) = sum( 0.5*results.testcase.gencost(:,5).*(Pnet.^2) +  results.testcase.gencost(:,6).*Pnet +  results.testcase.gencost(:,7) )/Money_ref{type_money};
+            Flow_rates{f}(test) = max(abs( results.PowerFlowDC ./ results.testcase.branch(:,6) )); 
+        end
+    end
+    
+    % Plot references
+    fig=figure(501);
+    hold on
+    legends=cell(n_fee+2,1);
+    hs=cell(n_fee+2,1);
+    xs = min(starts):max(stops);
+    xs = xs./Price_ref *100;
+    if type_scale
+        hs{1}=plot(xs,log10(Pool_Obj*ones(length(xs),1)),'Color','k','LineWidth',1.1);
+        hs{2}=plot(xs,log10(ED_Obj*ones(length(xs),1)),'-.','Color','k','LineWidth',1.1);
+    else
+        hs{1}=plot(xs,-Pool_Obj*ones(length(xs),1),'Color','k','LineWidth',1.1);
+        hs{2}=plot(xs,-ED_Obj*ones(length(xs),1),'-.','Color','k','LineWidth',1.1);
+    end
+    legends{1}='Free market';
+    legends{2}='Endogenous P2P (1)';
+    
+    % Plot results
+    maxs = zeros(n_fee,1);
+    mins = zeros(n_fee,1);
+    count=3;
+    for f=1:n_fee
+        xs = Fees{f}.n_tests_start:Fees{f}.n_tests_stop;
+        xs = xs./Price_ref *100;
+        if type_full
+            ids = 1:length(xs);
+        else
+            ids = find(Flow_rates{f}<=1);
+        end
+        if type_scale
+            hs{count}=plot(xs(ids),log10(Obj{f}(ids)),'Color',Colors(f,:),'LineWidth',1.1);
+            maxs(f) = log10(max(Obj{f}(ids)));
+            mins(f) = log10(min(Obj{f}(ids)));
+        else
+            hs{count}=plot(xs(ids),-Obj{f}(ids),'Color',Colors(f,:),'LineWidth',1.1);
+            maxs(f) = max(-Obj{f}(ids));
+            mins(f) = min(-Obj{f}(ids));
+        end
+        legends{count}=strcat('Feasible \it',Fees{f}.legend2);
+        count=count+1;
+    end
+    
+    vline(10/Price_ref*100,'k--','17.5%')
+    legend(legends,'FontName','Times New Roman','FontSize',10)%,'Location','northwest')
+    xlabel('Unit fee (% of free market price)','FontName','Times New Roman','FontSize',11);
+%     if type_full
+        if type_scale
+            ylabel(strcat('Global objective value (',Money_txt{type_money},', log_{10})'),'FontName','Times New Roman','FontSize',11);
+        else
+            ylabel(strcat('Total social welfare (',Money_txt{type_money},')'),'FontName','Times New Roman','FontSize',11);
+        end
+%     else
+%         if type_scale
+%             ylabel(strcat('Feasible global objective value (',Money_txt{type_money},', log_{10})'),'FontName','Times New Roman','FontSize',11);
+%         else
+%             ylabel(strcat('Feasible total social welfare (',Money_txt{type_money},')'),'FontName','Times New Roman','FontSize',11);
+%         end
+%     end
+    xlim([min(starts) max(stops)]./Price_ref *100)
+    %ylim([min(mins)-5 max(maxs)+5])
+    ylim([-5 145])
+    fig.Position(3:4) = [492   626/2];
 end
 
 %% Plot - Line flow rates evolution
@@ -417,7 +623,7 @@ if strcmp(type_plot,'lflows')
 %             plot(xs,avg_max_ref{f}.*ones(length(xs),1),'k--')
 %             plot(xs,avg_min_ref{f}.*ones(length(xs),1),'k--')
             legend([hs{1} hs{2} hs{3}],legends,'FontName','Times New Roman','FontSize',10)
-            xlabel(strcat('\it',{' '},Fees{f}.legend2,'\rm network fee (% of free market electricity price)'),'FontName','Times New Roman','FontSize',11);
+            xlabel(strcat('\it',{' '},Fees{f}.legend2,'\rm Unit fee (% of free market price)'),'FontName','Times New Roman','FontSize',11);
             ylabel('Lines rate (% of line capacity)','FontName','Times New Roman','FontSize',11);
             hold off
             fig.Position(3:4) = [492   626/2];
@@ -477,6 +683,7 @@ if strcmp(type_plot,'lflows')
             ylabel('Normalized distance equivalent (MW.Ohm)');
             hold off
         end
+        vline(10/Price_ref*100,'k--','17.5%')
     end
     if type_display==3 || type_display==5
         % display options
@@ -504,7 +711,7 @@ if strcmp(type_plot,'lflows')
             hh = [hh hs{f}];
         end
         legend(hh,legends,'FontName','Times New Roman','FontSize',10)
-        xl=xlabel('Network fee (% of free market electricity price)','FontName','Times New Roman','FontSize',11);
+        xl=xlabel('Unit fee (% of free market price)','FontName','Times New Roman','FontSize',11);
         ylabel('Lines rate (% of line capacity)','FontName','Times New Roman','FontSize',11);
         %hold off
     end
@@ -533,8 +740,9 @@ if strcmp(type_plot,'lflows')
         end
         axis tight
         ax2.XLim = ax1.XLim;
-        xlabel('Network fee (% of free market electricity price)','FontName','Times New Roman','FontSize',11);
+        xlabel('Unit fee (% of free market price)','FontName','Times New Roman','FontSize',11);
         ylabel('Total collected fees \Gamma_{SO} (k€)','FontName','Times New Roman','FontSize',11);
+        vline(10/Price_ref*100,'k--')
         
         
         if disp_op

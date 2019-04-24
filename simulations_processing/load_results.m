@@ -13,12 +13,12 @@ end
 if length(size(results.P))~=2
     error('Problem of data input: P')
 end
-if length(size(results.Z))==3
-    results.Zall = results.Z;
-    results.Z = results.Zall(:,:,results.k);
+if length(size(results.P))==3
+    results.Pall = results.P;
+    results.P = results.Pall(:,:,results.k);
     reduced=1;
 end
-if length(size(results.Z))~=2
+if length(size(results.P))~=2
     error('Problem of data input: Z')
 end
 if length(size(results.Y))==3
@@ -61,6 +61,7 @@ if ~isfield(results,'PowerFlowDC')
     mpopt_case = mpoption('model', 'DC','out.all',0);
     [pf_casedata, success] = runpf(pf_casedata,mpopt_case);
     if success
+        %printpf(results);
         results.PowerFlowDC = pf_casedata.branch(:,14);
         save(strcat('simulations/results_',label,'_',num2str(test),'.mat'),'results');
     else
