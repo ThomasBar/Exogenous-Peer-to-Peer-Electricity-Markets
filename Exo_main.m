@@ -48,7 +48,7 @@ ADMM_opt.stopcrit = 'on';
 ADMM_opt.espPrimR = 1e-3;
 ADMM_opt.espDualR = 1e-3;
 ADMM_opt.TradeBound = 'on';
-ADMM_opt.Plot = 'all';
+ADMM_opt.Plot = 'none';
 
 %% Simulation
 for test=n_tests_start:n_tests_stop
